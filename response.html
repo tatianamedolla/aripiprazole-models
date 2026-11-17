@@ -1,0 +1,636 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="author" content="Tatiana Medolla">
+<meta name="description" content="Educational simulation of how aripiprazole (Abilify) acts in the brain. Not medical advice. Not for clinical use.">
+<title>Aripiprazole Response Model</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: notice, dose + day controls on top, dopamine-pathway brain map beside exposure charts, D2 synapse close-up, then the scenario's outcome panel, the receptor-affinity chart, sources, terms and credit. */
+:root {
+  --bg: #F2F5F4; --surface: #FFFFFF; --ink: #14211F; --muted: #566663; --line: #D5DEDC; --cyto: #EDF2F1; --lipid: #E1E8E6;
+  --drug: #00896B;            /* aripiprazole */
+  --da: #C9731E;              /* dopamine */
+  --low: #3D63B8; --mid: #A9B3B1; --high: #C4452F;  /* signal below / at / above healthy baseline */
+  --s1: #C4452F; --s2: #2F6FC4; --s3: #9A7A00;     /* adverse-effect series */
+  --scen: #00896B;
+  --alert-bg: #FDF0EE; --alert-line: #E3B3AB; --alert-ink: #6E1A12; --bad: #B3261E;
+  --f-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --f-body: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --r: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0E1514; --surface: #151E1D; --ink: #E4ECEA; --muted: #92A39F; --line: #263331; --cyto: #19231F; --lipid: #22302D;
+    --drug: #2AA088; --da: #C47A2A; --low: #6F92E6; --mid: #5E6B69; --high: #E0654D;
+    --s1: #E0654D; --s2: #5A8EE0; --s3: #AD8C14; --scen: #2AA088;
+    --alert-bg: #2A1512; --alert-line: #6B2C24; --alert-ink: #FFD2CB; --bad: #FF6B5E; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0E1514; --surface: #151E1D; --ink: #E4ECEA; --muted: #92A39F; --line: #263331; --cyto: #19231F; --lipid: #22302D;
+  --drug: #2AA088; --da: #C47A2A; --low: #6F92E6; --mid: #5E6B69; --high: #E0654D;
+  --s1: #E0654D; --s2: #5A8EE0; --s3: #AD8C14; --scen: #2AA088;
+  --alert-bg: #2A1512; --alert-line: #6B2C24; --alert-ink: #FFD2CB; --bad: #FF6B5E; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body {
+  margin: 0;
+  background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 24px 40px;
+}
+.wrap { max-width: 1240px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(28px, 4.4vw, 46px); font-weight: 800; font-stretch: 118%; letter-spacing: -0.01em; line-height: 1.05; }
+h2 { font-size: 17px; font-weight: 700; font-stretch: 112%; }
+h3 { font-size: 14px; font-weight: 700; }
+p { margin: 0; }
+.eyebrow { font-family: var(--f-mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.mono { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); }
+a { color: var(--drug); }
+
+.notice { background: var(--alert-bg); border: 1px solid var(--alert-line); border-left: 6px solid var(--bad); border-radius: var(--r); padding: 12px 16px; color: var(--alert-ink); display: flex; flex-direction: column; gap: 4px; }
+.notice h2 { color: var(--bad); font-size: 14px; letter-spacing: 0.04em; text-transform: uppercase; }
+.notice p { font-size: 14px; max-width: 110ch; }
+.notice a { color: inherit; font-weight: 600; }
+
+.top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 400px); gap: 20px; align-items: end; }
+.lede { max-width: 64ch; margin-top: 10px; color: var(--muted); }
+.scen-tag { display: inline-flex; align-items: center; gap: 8px; margin-bottom: 10px; padding: 3px 10px 3px 6px; border-radius: 99px; border: 1px solid var(--scen); font-size: 12px; font-weight: 600; }
+.scen-tag i { width: 10px; height: 10px; border-radius: 50%; background: var(--scen); }
+.companion { margin-top: 12px; font-size: 13px; }
+.controls { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.row { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.ctl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; }
+.ctl-grid label { font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 4px; }
+select, button { font: inherit; font-size: 13px; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; cursor: pointer; }
+button:hover { border-color: var(--muted); }
+button[aria-pressed="true"] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--drug); outline-offset: 2px; }
+input[type=range] { width: 100%; accent-color: var(--drug); height: 28px; }
+.readouts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.readouts div { border-top: 3px solid var(--line); padding-top: 6px; min-width: 0; }
+.readouts .big { font-family: var(--f-mono); font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.readouts .d { border-top-color: var(--drug); }
+@media (max-width: 900px) { .top { grid-template-columns: minmax(0, 1fr); } }
+
+.grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 18px; }
+@media (max-width: 900px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 18px; min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+.panel-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.span-2 { grid-column: 1 / -1; }
+
+.brain { width: 100%; height: auto; display: block; }
+.tissue { fill: var(--cyto); stroke: var(--line); stroke-width: 1.5; }
+.sulcus { fill: none; stroke: var(--line); stroke-width: 1.4; stroke-linecap: round; }
+.lbl { font-family: var(--f-mono); font-size: 11px; fill: var(--ink); paint-order: stroke; stroke: var(--surface); stroke-width: 3px; stroke-linejoin: round; pointer-events: none; }
+.lbl.m { fill: var(--muted); font-size: 10px; }
+.path { fill: none; stroke-width: 5; stroke-linecap: round; cursor: pointer; }
+.path-hit { fill: none; stroke: transparent; stroke-width: 18; cursor: pointer; }
+.node { stroke: var(--surface); stroke-width: 2; }
+.legend { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; font-size: 12px; color: var(--muted); }
+.sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+.div-ramp { width: 120px; height: 10px; border-radius: 2px; background: linear-gradient(90deg, var(--low), var(--mid), var(--high)); }
+
+.pw-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 560px) { .pw-list { grid-template-columns: minmax(0, 1fr); } }
+.pw { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; cursor: pointer; background: var(--surface); text-align: left; }
+.pw.sel { border-color: var(--ink); }
+.pw .nm { display: flex; justify-content: space-between; gap: 8px; font-weight: 700; font-size: 13px; }
+.pw .nm span:last-child { font-family: var(--f-mono); font-weight: 600; }
+.pw .what { font-size: 12px; color: var(--muted); }
+.sigbar { position: relative; height: 8px; border-radius: 4px; background: var(--bg); border: 1px solid var(--line); }
+.sigbar .base { position: absolute; left: 50%; top: -3px; bottom: -3px; width: 2px; background: var(--ink); }
+.sigbar b { position: absolute; top: 0; bottom: 0; border-radius: 3px; }
+
+canvas { display: block; width: 100%; }
+.chart-wrap { position: relative; }
+.tip { position: absolute; pointer-events: none; background: var(--ink); color: var(--surface); font-family: var(--f-mono); font-size: 11px; padding: 5px 8px; border-radius: 5px; white-space: nowrap; transform: translate(-50%, -115%); z-index: 2; }
+
+.syn { width: 100%; height: auto; display: block; }
+.tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+.syn-read { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; font-size: 13px; }
+.syn-read div { display: flex; flex-direction: column; }
+.syn-read .mono { font-size: 18px; font-weight: 600; }
+
+.cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 900px) { .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .cards { grid-template-columns: minmax(0, 1fr); } }
+.card { border: 1px solid var(--line); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.card .hd { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.card p { font-size: 13px; }
+.chip { font-family: var(--f-mono); font-size: 10.5px; padding: 1px 7px; border-radius: 4px; border: 1px solid var(--line); white-space: nowrap; }
+.meter { height: 8px; border-radius: 4px; background: var(--bg); border: 1px solid var(--line); overflow: hidden; }
+.meter b { display: block; height: 100%; border-radius: 0 4px 4px 0; background: var(--scen); }
+.state { font-size: 12px; font-weight: 600; }
+.note { font-size: 13px; padding: 10px 12px; border-radius: 6px; background: var(--bg); border: 1px solid var(--line); }
+footer { font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 6px; max-width: 92ch; }
+.g-syn { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); }
+.g-out { grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); }
+.cards.c2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 900px) { .g-syn, .g-out { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 560px) { .cards.c2 { grid-template-columns: minmax(0, 1fr); } .readouts .big { font-size: 16px; } .syn-read .mono { font-size: 15px; } }
+[data-only]:not([data-only="effective"]) { display: none !important; }
+
+.terms { gap: 10px; }
+.terms ol { margin: 0; padding-left: 1.4em; display: flex; flex-direction: column; gap: 8px; max-width: 100ch; font-size: 13px; }
+.terms li b { font-weight: 700; }
+.terms .updated { font-family: var(--f-mono); font-size: 12px; color: var(--muted); }
+.credit { border-top: 1px solid var(--line); padding-top: 14px; display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: var(--muted); }
+.credit .by { color: var(--ink); font-size: 13.5px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <section class="notice" role="note" aria-label="Not for clinical or medical use">
+    <h2>Not for clinical or medical use</h2>
+    <p><strong>This simulation is for educational purposes only.</strong> It is not a medical device and has not been cleared or approved by the FDA or any other regulatory body. It is not medical advice. Do not use it to diagnose, treat, dose, prescribe, or make any decision about a patient or a medication.</p>
+    <p>The patient shown is simulated and does not represent any real person. Results are simplified models built from published research and cannot predict how any individual will respond. If you take aripiprazole, talk to your prescriber before changing or stopping a dose.</p>
+    <p>The creator does not control or monitor how this page is used and is not liable for any use of it by anyone. By using this page you agree to the <a href="#terms">Terms of Use and Disclaimer</a> at the bottom of this page.</p>
+  </section>
+
+  <header class="top">
+    <div>
+      <span class="scen-tag"><i></i>Scenario A · effective treatment</span>
+      <h1>Aripiprazole Response Model</h1>
+      <p class="lede">How aripiprazole (Abilify) reaches the brain and calms an overactive dopamine system. This simulated patient takes 10 mg a day with normal metabolism and responds well: psychotic symptoms ease over a few weeks with movement and prolactin left largely intact.</p>
+      <p class="companion muted">Companion page: <a href="adverse.html">Aripiprazole Adverse Effects Model</a>. Both pages run the same pharmacology; only the simulated patient differs.</p>
+    </div>
+    <div class="controls">
+      <div class="ctl-grid">
+        <label>Daily oral dose<select id="dose"><option value="2">2 mg</option><option value="5">5 mg</option><option value="10">10 mg</option><option value="15">15 mg</option><option value="20">20 mg</option><option value="30">30 mg</option></select></label>
+        <label>CYP2D6 metabolism<select id="cyp"><option value="1">Normal</option><option value="1.8">Poor metabolizer</option><option value="2.4">Poor + strong CYP3A4 inhibitor</option></select></label>
+      </div>
+      <div class="row"><label for="day">Treatment day</label><span class="mono" id="dayVal">Day 14</span></div>
+      <input type="range" id="day" min="0" max="42" step="0.25" value="14">
+      <div class="readouts">
+        <div class="d"><span class="eyebrow">Plasma</span><div class="big" id="rConc">—</div></div>
+        <div class="d"><span class="eyebrow">D2 occupancy</span><div class="big" id="rOcc">—</div></div>
+        <div><span class="eyebrow">Steady state</span><div class="big" id="rSS">—</div></div>
+      </div>
+    </div>
+  </header>
+
+  <div class="grid">
+    <section class="panel" aria-labelledby="h-brain">
+      <div class="panel-head"><h2 id="h-brain">Dopamine pathways</h2><span class="eyebrow">Signal vs healthy baseline · select a pathway</span></div>
+      <svg class="brain" id="brain" viewBox="40 30 540 410" role="group" aria-label="Brain with four dopamine pathways and serotonin projections">
+        <defs><marker id="arr" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="var(--ink)"/></marker></defs>
+        <path class="tissue" d="M298 280 C308 300 314 330 326 360 C334 382 338 402 342 430 L378 430 C374 404 373 384 372 360 C380 340 378 320 362 300 C360 292 358 286 356 280 Z"/>
+        <path class="tissue" d="M398 300 C418 282 500 282 522 308 C538 336 506 372 460 368 C424 365 392 342 398 300 Z"/>
+        <path class="tissue" d="M95 260 C70 190 110 95 210 70 C290 48 400 55 470 100 C530 140 550 210 525 265 C510 295 470 300 440 290 C410 282 380 290 350 300 C320 310 300 330 260 330 C220 330 190 320 165 305 C130 300 105 290 95 260 Z"/>
+        <path class="sulcus" d="M330 62 C320 110 345 150 330 190 M175 270 C230 245 300 240 360 255 M470 105 C450 150 460 190 440 215 M150 120 C175 140 170 175 200 190 M395 70 C400 100 385 120 410 140 M412 318 C440 305 490 305 515 320"/>
+        <path d="M205 210 C230 160 360 150 405 200 C400 215 385 210 375 200 C340 175 260 175 225 212 Z" fill="var(--lipid)" stroke="var(--line)"/>
+        <ellipse cx="150" cy="168" rx="58" ry="40" fill="var(--mid)" fill-opacity=".18" id="z-meso-c"/>
+        <ellipse cx="262" cy="214" rx="30" ry="15" fill="var(--mid)" fill-opacity=".3" id="z-nigro"/>
+        <ellipse cx="226" cy="254" rx="16" ry="10" fill="var(--mid)" fill-opacity=".3" id="z-meso-l"/>
+        <circle cx="262" cy="302" r="9" fill="var(--mid)" fill-opacity=".4" id="z-tida"/>
+        <path d="M352 336 C392 250 320 132 205 112" fill="none" stroke="var(--muted)" stroke-width="1.5" stroke-dasharray="2 5"/>
+        <path d="M352 336 C380 280 360 220 300 200" fill="none" stroke="var(--muted)" stroke-width="1.5" stroke-dasharray="2 5"/>
+        <g id="paths"></g>
+        <circle class="node" cx="320" cy="300" r="7" fill="var(--da)"/>
+        <circle class="node" cx="342" cy="290" r="7" fill="var(--da)"/>
+        <circle class="node" cx="268" cy="270" r="6" fill="var(--da)"/>
+        <circle class="node" cx="352" cy="336" r="6" fill="var(--muted)"/>
+        <circle class="node" cx="372" cy="398" r="6" fill="var(--muted)"/>
+        <text class="lbl" x="150" y="172" text-anchor="middle">Prefrontal cortex</text>
+        <text class="lbl" x="262" y="200" text-anchor="middle">Dorsal striatum</text>
+        <text class="lbl" x="205" y="244" text-anchor="end">Nucleus accumbens</text>
+        <text class="lbl" x="250" y="318" text-anchor="end">Pituitary</text>
+        <text class="lbl" x="300" y="318" text-anchor="end">VTA</text>
+        <text class="lbl" x="356" y="284">SNc</text>
+        <text class="lbl" x="256" y="284" text-anchor="end">Arcuate</text>
+        <text class="lbl m" x="362" y="342">Raphe (5-HT)</text>
+        <text class="lbl m" x="384" y="402">Area postrema</text>
+      </svg>
+      <div class="legend">
+        <span>Below baseline</span><span class="div-ramp" aria-hidden="true"></span><span>Above baseline</span>
+        <span><span class="sw" style="background:var(--da);border-radius:50%"></span>Dopamine cell groups</span>
+        <span>Dotted: serotonin projections</span>
+      </div>
+      <div class="pw-list" id="pwList"></div>
+    </section>
+
+    <section class="panel" aria-labelledby="h-exp">
+      <div class="panel-head"><h2 id="h-exp">Getting into the brain</h2><span class="eyebrow">Once-daily dosing · 42 days</span></div>
+      <p class="muted" style="font-size:13px">Aripiprazole is absorbed over 3–5 hours and leaves slowly (half-life about 75 hours). It builds up for roughly two weeks before levels stop rising, which is one reason benefits and some side effects take time to appear.</p>
+      <div><h3>Plasma concentration</h3><span class="muted" style="font-size:12px">ng/mL · shaded: usual reference range 100–350</span></div>
+      <div class="chart-wrap"><canvas id="cConc" height="150" aria-label="Plasma aripiprazole over time"></canvas><div class="tip" id="tConc" hidden></div></div>
+      <div><h3>Striatal D2 receptor occupancy</h3><span class="muted" style="font-size:12px">% of receptors bound · shaded: typical treatment range 80–90%</span></div>
+      <div class="chart-wrap"><canvas id="cOcc" height="150" aria-label="D2 occupancy over time"></canvas><div class="tip" id="tOcc" hidden></div></div>
+    </section>
+
+    <section class="panel span-2" aria-labelledby="h-syn">
+      <div class="panel-head"><h2 id="h-syn">At the D2 receptor</h2><div class="tabs" id="synTabs" role="group" aria-label="Pathway"></div></div>
+      <div class="grid g-syn">
+        <svg class="syn" id="syn" viewBox="0 0 640 280" aria-label="Dopamine synapse with D2 receptors, dopamine and aripiprazole"></svg>
+        <div style="display:flex;flex-direction:column;gap:12px;min-width:0">
+          <div class="syn-read">
+            <div><span class="eyebrow">Dopamine tone</span><span class="mono" id="sTone">—</span></div>
+            <div><span class="eyebrow">Drug-bound</span><span class="mono" id="sOcc">—</span></div>
+            <div><span class="eyebrow">Net D2 signal</span><span class="mono" id="sSig">—</span></div>
+          </div>
+          <p id="sText" style="font-size:14px"></p>
+          <p class="muted" style="font-size:13px">Aripiprazole is a partial agonist. When it sits on a D2 receptor it switches the receptor on, but only to roughly a quarter or a third of what dopamine does. So it lowers the signal where dopamine is high and can raise it where dopamine is low. How strong that partial signal feels depends on how many spare receptors a tissue has (receptor reserve). The pituitary has a lot, so there aripiprazole acts almost like dopamine itself.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel span-2" data-only="effective" aria-labelledby="h-eff">
+      <div class="panel-head"><h2 id="h-eff">When it works</h2><span class="eyebrow">Simulated patient: acute schizophrenia, good response</span></div>
+      <div class="grid g-out">
+        <div style="display:flex;flex-direction:column;gap:8px;min-width:0">
+          <div><h3>Positive symptoms over time</h3><span class="muted" style="font-size:12px">PANSS positive subscale, illustrative course (7 = none, 49 = most severe)</span></div>
+          <div class="chart-wrap"><canvas id="cSym" height="180" aria-label="Positive symptom score over time"></canvas><div class="tip" id="tSym" hidden></div></div>
+        </div>
+        <div class="cards c2" id="effCards"></div>
+      </div>
+    </section>
+
+    <section class="panel span-2" data-only="adverse" aria-labelledby="h-adv">
+      <div class="panel-head"><h2 id="h-adv">When it causes problems</h2><span class="eyebrow">Simulated patient: high exposure, side effects emerging</span></div>
+      <div class="grid g-out">
+        <div style="display:flex;flex-direction:column;gap:8px;min-width:0">
+          <div><h3>Modeled risk over time</h3><span class="muted" style="font-size:12px">Relative risk index, illustrative, 0–100</span></div>
+          <div class="chart-wrap"><canvas id="cRisk" height="180" aria-label="Side-effect risk indices over time"></canvas><div class="tip" id="tRisk" hidden></div></div>
+          <div class="legend"><span><span class="sw" style="background:var(--s1)"></span>Akathisia</span><span><span class="sw" style="background:var(--s2)"></span>Nausea</span><span><span class="sw" style="background:var(--s3)"></span>Impulse-control problems</span></div>
+          <p class="note">If any of these happen on a real prescription, talk to the prescriber before changing or stopping the dose. Most are managed by adjusting the dose or adding a treatment.</p>
+        </div>
+        <div class="cards c2" id="advCards"></div>
+      </div>
+    </section>
+
+    <section class="panel span-2" aria-labelledby="h-aff">
+      <div class="panel-head"><h2 id="h-aff">Receptor profile</h2><span class="eyebrow">Binding affinity, Ki in nM (smaller = binds more tightly)</span></div>
+      <div class="chart-wrap" style="overflow-x:auto"><canvas id="cAff" height="300" style="min-width:560px" aria-label="Aripiprazole receptor binding affinities"></canvas><div class="tip" id="tAff" hidden></div></div>
+      <p class="muted" style="font-size:13px">Values from the US prescribing information. The strongest binding is at D2, D3 and 5-HT1A (partial agonist) and 5-HT2A (antagonist). Weaker binding at α1-adrenergic and H1 histamine receptors explains occasional dizziness on standing and sleepiness.</p>
+    </section>
+  </div>
+
+  <footer>
+    <p><b>Educational model, not medical advice.</b> Concentration and occupancy curves are fitted to published PET and pharmacokinetic studies. Symptom and risk curves are illustrative, built to match the direction and timing reported in trials, not predictions for any person. Adverse-effect frequencies come from the prescribing information and trial pooling and vary by condition and dose.</p>
+    <p>Sources: Abilify (aripiprazole) US prescribing information; Burris et al., J Pharmacol Exp Ther 2002 (D2 partial agonism); Grunder et al., Arch Gen Psychiatry 2003 and Kegeles et al., Biol Psychiatry 2008 (D2 occupancy); Hiemke et al., Pharmacopsychiatry 2018 (AGNP reference range); Huhn et al., Lancet 2019 (antipsychotic network meta-analysis); Leucht et al., Am J Psychiatry 2017 (response rates); FDA Drug Safety Communication, May 2016 (impulse-control problems); Pillinger et al., Lancet Psychiatry 2020 (metabolic effects).</p>
+  </footer>
+
+  <section class="panel terms" id="terms" aria-labelledby="h-terms">
+    <h2 id="h-terms">Terms of Use and Disclaimer</h2>
+    <p class="updated">Last updated 16 November 2026</p>
+    <ol>
+      <li><b>Not a medical device.</b> This simulation is not a medical device. It has not been cleared, approved or reviewed by the U.S. Food and Drug Administration (FDA) or any other regulatory body. It is not intended to diagnose, treat, cure, monitor, mitigate or prevent any disease or condition, or to inform any clinical decision.</li>
+      <li><b>No medical advice.</b> Nothing shown on this page is medical advice, and using it does not create a doctor–patient or any other professional relationship. Always consult a qualified healthcare professional about any medical question. In an emergency, call your local emergency number.</li>
+      <li><b>Educational use only.</b> This page only illustrates published research in a simplified, interactive form. It does not analyze, interpret, detect or diagnose anything about any person.</li>
+      <li><b>Not for dosing or prescribing.</b> Do not use this page to choose, start, change or stop any medication or dose, for yourself or anyone else. Those decisions must be made with a licensed prescriber who knows the patient.</li>
+      <li><b>Simulated patients and illustrative results.</b> The patients shown are computer-simulated and do not come from or represent any real person. Concentration, occupancy, symptom and risk curves are simplified models fitted to published studies. They may contain errors and cannot predict how any individual will respond.</li>
+      <li><b>Your responsibility.</b> You are solely responsible for how you use this page and for any decision you make. You are responsible for following all laws and policies that apply to you, including the rules of your employer or institution.</li>
+      <li><b>No control or monitoring.</b> The creator does not operate, control, monitor or supervise how, where, why or by whom this page is used. The creator is not responsible or liable for any use of this page by anyone, for any purpose, including use by healthcare professionals, patients, or in clinical, research or educational settings. Anyone who uses it does so entirely at their own risk and under their own judgment.</li>
+      <li><b>Privacy.</b> The page runs entirely in your web browser and collects no personal information. Nothing you select is uploaded, stored or sent anywhere by this page. The page loads its fonts from Google Fonts, and the website host may keep standard server logs such as IP addresses, as nearly all websites do.</li>
+      <li><b>No warranty.</b> The page is provided "as is" and "as available", without warranties of any kind, express or implied, including warranties of accuracy, reliability, merchantability, fitness for a particular purpose and non-infringement. There is no guarantee that it is error-free or always available.</li>
+      <li><b>Limitation of liability.</b> To the fullest extent permitted by law, Tatiana Medolla is not liable for any direct, indirect, incidental, special, consequential or punitive damages arising from the use of, misuse of, reliance on, or inability to use this page by anyone, for any purpose, including personal injury, medication or treatment decisions, even if advised of the possibility of such damages.</li>
+      <li><b>Indemnity.</b> You agree to hold harmless and indemnify Tatiana Medolla against any claims, losses or expenses arising from your use or misuse of this page or your breach of these terms.</li>
+      <li><b>Built with AI assistance.</b> This simulation was developed with the help of AI tools (Claude) and may contain errors.</li>
+      <li><b>Personal learning project.</b> Tatiana Medolla created this simulation as a personal, non-commercial project to gain experience. It is not a business or a company product, is offered free of charge, and comes with no promise of support, maintenance, updates or fitness for any particular use. The creator's role was limited to creating the simulation.</li>
+      <li><b>Sources.</b> Values are drawn from the published sources listed on this page. The creator does not own those sources and does not guarantee that they are complete or current.</li>
+      <li><b>No affiliation.</b> This project is independent and is not affiliated with, sponsored by or endorsed by any drug manufacturer, pharmacy, hospital or medical organization. Abilify® is a registered trademark of Otsuka Pharmaceutical Co., Ltd. Any other product names mentioned belong to their owners.</li>
+      <li><b>Copies and changes.</b> If you received this page from someone other than the creator, or if it has been changed in any way, the creator is not responsible for that copy or for any changes made to it.</li>
+      <li><b>Changes.</b> These terms and the page may change at any time without notice. Continuing to use the page means you accept the current terms.</li>
+    </ol>
+  </section>
+
+  <div class="credit">
+    <span class="by">Created by <b>Tatiana Medolla</b> · Built with AI assistance (Claude) · 2026</span>
+    <span>© 2026 Tatiana Medolla. All rights reserved. For educational use only. Not a medical device and not intended for clinical use, diagnosis, dosing or patient care. Provided as is, without warranty of any kind. See the <a href="#terms" style="color:inherit">Terms of Use and Disclaimer</a>.</span>
+  </div>
+</div>
+
+<script>
+(() => {
+const SCENARIO = 'effective';
+const $ = s => document.querySelector(s);
+const NS = 'http://www.w3.org/2000/svg';
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+const hill = (x, x50, n) => x <= 0 ? 0 : Math.pow(x, n) / (Math.pow(x, n) + Math.pow(x50, n));
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const S = SCENARIO === 'effective'
+  ? { dose: 10, cyp: 1, day: 14, pw: 'meso_l' }
+  : { dose: 30, cyp: 1.8, day: 14, pw: 'nigro' };
+$('#dose').value = String(S.dose); $('#cyp').value = String(S.cyp); $('#day').value = S.day;
+
+/* ---------- pharmacokinetics: one-compartment oral, once daily ---------- */
+const KE = Math.LN2 / 75, KA = 0.9; // per hour
+const CSS_PER_MG = 11.5;            // ng/mL average steady state per mg/day, normal metabolizer
+const DAYS = 42, STEP = 2;          // hours per sample
+let series = [];
+function simulate() {
+  const css = CSS_PER_MG * S.dose * S.cyp, ke = KE / S.cyp;
+  const K = css * 24 * ke; // AUC per dose / 24 h equals the average steady state
+  series = [];
+  for (let h = 0; h <= DAYS * 24; h += STEP) {
+    let c = 0;
+    for (let k = 0; k * 24 <= h; k++) { const t = h - k * 24; c += K * KA / (KA - ke) * (Math.exp(-ke * t) - Math.exp(-KA * t)); }
+    series.push({ d: h / 24, c, occ: occFromC(c) });
+  }
+  // pin the plateau to the intended average steady state
+  const tail = series.filter(p => p.d > DAYS - 7), avg = tail.reduce((a, p) => a + p.c, 0) / tail.length;
+  const f = css / avg; series.forEach(p => { p.c *= f; p.occ = occFromC(p.c); });
+  // steady state: first day reaching 90% of plateau trough
+  const tHalf = Math.log(2) / ke / 24; S.ssDay = Math.round(tHalf * 3.3);
+  simSymptoms(); simRisks();
+}
+const occFromC = c => 95 * c / (c + 8.5);  // Emax 95%, EC50 8.5 ng/mL, fitted to Grunder 2003 / Kegeles 2008
+const at = d => series[clamp(Math.round(d * 24 / STEP), 0, series.length - 1)];
+
+/* ---------- pathway model ---------- */
+// tone: dopamine level relative to healthy (1). ia: aripiprazole output relative to healthy baseline signal.
+const PW = {
+  meso_l: { name: 'Mesolimbic', from: 'VTA → nucleus accumbens', d: 'M320 300 C292 300 254 280 232 260', zone: 'z-meso-l', ia: .55,
+    tone: { effective: 1.7, adverse: 1.7 },
+    role: 'Reward and salience. Too much dopamine here is linked to hallucinations and delusions.' },
+  meso_c: { name: 'Mesocortical', from: 'VTA → prefrontal cortex', d: 'M318 296 C282 252 214 204 168 178', zone: 'z-meso-c', ia: .55,
+    tone: { effective: .55, adverse: .55 },
+    role: 'Motivation and thinking. Low dopamine here is linked to negative and cognitive symptoms.' },
+  nigro: { name: 'Nigrostriatal', from: 'SNc → dorsal striatum', d: 'M342 288 C334 252 304 226 276 218', zone: 'z-nigro', ia: .55,
+    tone: { effective: 1, adverse: 1 },
+    role: 'Movement. Blocking too much signal here causes stiffness, tremor and restlessness.' },
+  tida: { name: 'Tuberoinfundibular', from: 'Arcuate → pituitary', d: 'M268 276 L263 292', zone: 'z-tida', ia: 1.15,
+    tone: { effective: 1, adverse: 1 },
+    role: 'Dopamine here holds prolactin down. High receptor reserve makes aripiprazole act almost as a full agonist.' }
+};
+const signal = (k, occ) => { const p = PW[k], o = occ / 100; return (1 - o) * p.tone[SCENARIO] + o * p.ia; };
+
+/* ---------- colors ---------- */
+let C = {};
+function readColors() {
+  const cs = getComputedStyle(document.documentElement);
+  ['bg','surface','ink','muted','line','drug','da','low','mid','high','s1','s2','s3','scen'].forEach(k => C[k] = cs.getPropertyValue('--' + k).trim());
+}
+const rgb = h => { h = h.replace('#', ''); return [0, 2, 4].map(i => parseInt(h.substr(i, 2), 16)); };
+const lerp = (a, b, t) => { const A = rgb(a), B = rgb(b); return `rgb(${A.map((v, i) => Math.round(v + (B[i] - v) * t))})`; };
+const divColor = s => s < 1 ? lerp(C.mid, C.low, clamp((1 - s) / .6, 0, 1)) : lerp(C.mid, C.high, clamp((s - 1) / .7, 0, 1));
+
+/* ---------- brain + pathway list ---------- */
+const pg = $('#paths');
+Object.entries(PW).forEach(([k, p]) => {
+  const hit = document.createElementNS(NS, 'path'); hit.setAttribute('d', p.d); hit.setAttribute('class', 'path-hit');
+  const vis = document.createElementNS(NS, 'path'); vis.setAttribute('d', p.d); vis.setAttribute('class', 'path'); vis.setAttribute('marker-end', 'url(#arr)'); vis.id = 'p-' + k;
+  pg.append(vis, hit);
+  hit.addEventListener('click', () => selectPw(k));
+});
+$('#pwList').innerHTML = Object.entries(PW).map(([k, p]) => `<button class="pw" data-k="${k}"><span class="nm"><span>${p.name}</span><span id="pv-${k}"></span></span><span class="what">${p.from}</span><span class="sigbar"><span class="base"></span><b id="pb-${k}"></b></span></button>`).join('');
+document.querySelectorAll('.pw').forEach(b => b.addEventListener('click', () => selectPw(b.dataset.k)));
+$('#synTabs').innerHTML = Object.entries(PW).map(([k, p]) => `<button data-k="${k}">${p.name}</button>`).join('');
+document.querySelectorAll('#synTabs button').forEach(b => b.addEventListener('click', () => selectPw(b.dataset.k)));
+function selectPw(k) {
+  S.pw = k;
+  document.querySelectorAll('.pw').forEach(b => b.classList.toggle('sel', b.dataset.k === k));
+  document.querySelectorAll('#synTabs button').forEach(b => b.setAttribute('aria-pressed', b.dataset.k === k));
+  Object.keys(PW).forEach(kk => $('#p-' + kk).setAttribute('stroke-width', kk === k ? 8 : 5));
+  updateSynapse();
+}
+function updateBrain() {
+  const occ = at(S.day).occ;
+  Object.keys(PW).forEach(k => {
+    const s = signal(k, occ), col = divColor(s);
+    $('#p-' + k).setAttribute('stroke', col);
+    $('#' + PW[k].zone).setAttribute('fill', col);
+    $('#pv-' + k).textContent = Math.round(s * 100) + '%';
+    const b = $('#pb-' + k), x = clamp(s / 2, 0, 1) * 100;
+    b.style.left = Math.min(50, x) + '%'; b.style.width = Math.abs(x - 50) + '%'; b.style.background = col;
+  });
+}
+
+/* ---------- synapse ---------- */
+const syn = $('#syn');
+const el = (tag, a, parent) => { const e = document.createElementNS(NS, tag); for (const k in a) e.setAttribute(k, a[k]); (parent || syn).appendChild(e); return e; };
+el('rect', { x: 0, y: 0, width: 640, height: 280, fill: 'var(--surface)' });
+el('path', { d: 'M120 0 L520 0 L520 70 Q520 96 494 96 L146 96 Q120 96 120 70 Z', fill: 'var(--cyto)', stroke: 'var(--line)', 'stroke-width': 2 });
+el('rect', { x: 0, y: 200, width: 640, height: 28, fill: 'var(--lipid)' });
+el('rect', { x: 0, y: 228, width: 640, height: 52, fill: 'var(--cyto)' });
+el('text', { class: 'lbl m', x: 134, y: 18 }).textContent = 'DOPAMINE TERMINAL';
+el('text', { class: 'lbl m', x: 10, y: 272 }).textContent = 'POSTSYNAPTIC NEURON';
+const RX = [150, 250, 350, 450, 550];
+const receptors = RX.map((x, i) => {
+  const g = el('g', {});
+  const body = el('rect', { x: x - 16, y: 176, width: 32, height: 60, rx: 9, fill: 'var(--mid)', 'fill-opacity': .4, stroke: 'var(--ink)', 'stroke-width': 1.2 }, g);
+  el('text', { class: 'lbl', x, y: 254, 'text-anchor': 'middle' }, g).textContent = 'D2';
+  const glow = el('circle', { cx: x, cy: 246, r: 0, fill: 'var(--high)', 'fill-opacity': .5 }, g);
+  const pocket = el('path', { d: `M${x - 9} 176 Q${x} 192 ${x + 9} 176`, fill: 'var(--surface)', stroke: 'var(--ink)', 'stroke-width': 1.2 }, g);
+  const lig = el('g', {}, g);
+  return { x, body, glow, lig, kind: null };
+});
+const DA = Array.from({ length: 30 }, () => ({ e: el('circle', { r: 3.4, fill: 'var(--da)' }), x: 0, y: 0, vx: 0, vy: 0, live: false }));
+const ARI = Array.from({ length: 12 }, () => ({ e: el('rect', { width: 14, height: 6, rx: 3, fill: 'var(--drug)', stroke: 'var(--ink)', 'stroke-width': .6 }), x: Math.random() * 640, y: 110 + Math.random() * 60, vx: (Math.random() - .5) * 30 }));
+el('circle', { cx: 452, cy: 132, r: 3.4, fill: 'var(--da)' }); el('text', { class: 'lbl m', x: 460, y: 136 }).textContent = 'dopamine';
+el('rect', { x: 532, y: 129, width: 14, height: 6, rx: 3, fill: 'var(--drug)' }); el('text', { class: 'lbl m', x: 550, y: 136 }).textContent = 'aripiprazole';
+let relT = 0;
+function assignReceptors() {
+  const occ = at(S.day).occ / 100, tone = PW[S.pw].tone[SCENARIO];
+  const nDrug = Math.round(occ * RX.length);
+  const daFrac = clamp(tone / 2, 0, 1);
+  receptors.forEach((r, i) => {
+    r.lig.innerHTML = '';
+    if (i < nDrug) { r.kind = 'ari'; el('rect', { x: r.x - 7, y: 175, width: 14, height: 6, rx: 3, fill: 'var(--drug)', stroke: 'var(--ink)', 'stroke-width': .6 }, r.lig); }
+    else if ((i - nDrug) / Math.max(1, RX.length - nDrug) < daFrac + .1) { r.kind = 'da'; el('circle', { cx: r.x, cy: 179, r: 4, fill: 'var(--da)' }, r.lig); }
+    else r.kind = null;
+  });
+}
+function updateSynapse() {
+  const p = PW[S.pw], occ = at(S.day).occ, s = signal(S.pw, occ), tone = p.tone[SCENARIO];
+  $('#sTone').textContent = Math.round(tone * 100) + '%';
+  $('#sOcc').textContent = Math.round(occ) + '%';
+  $('#sSig').textContent = Math.round(s * 100) + '%';
+  $('#sSig').style.color = divColor(s);
+  const txt = {
+    meso_l: `Dopamine here is running at about ${Math.round(tone * 100)}% of normal, as in active psychosis. With ${Math.round(occ)}% of D2 receptors held by aripiprazole, the net signal drops to ${Math.round(s * 100)}%.`,
+    meso_c: `Dopamine here is low (${Math.round(tone * 100)}% of normal). Because aripiprazole gives a partial signal of its own, the net signal ${s > tone ? 'rises' : 'falls'} to ${Math.round(s * 100)}%. This lift is a proposed mechanism for some benefit on negative symptoms; the clinical effect is modest.`,
+    nigro: `Dopamine tone is normal here. Aripiprazole lowers the net signal to ${Math.round(s * 100)}%, a smaller cut than a full blocker like haloperidol would make at the same occupancy, which is why stiffness and tremor are less common.`,
+    tida: `In the pituitary, aripiprazole acts almost like dopamine, so the signal sits at ${Math.round(s * 100)}%. Prolactin stays normal or drops below normal, unlike with most other antipsychotics.`
+  }[S.pw];
+  $('#sText').textContent = txt;
+  receptors.forEach(r => r.body.setAttribute('fill', divColor(s)));
+  assignReceptors();
+  updateBrain();
+}
+function synFrame(dt) {
+  const tone = PW[S.pw].tone[SCENARIO], occ = at(S.day).occ / 100;
+  relT -= dt;
+  if (relT <= 0) { relT = .9; let n = Math.round(4 + 8 * tone); for (const d of DA) if (!d.live && n-- > 0) { d.live = true; d.x = 200 + Math.random() * 240; d.y = 98; d.vx = (Math.random() - .5) * 120; d.vy = 40 + Math.random() * 60; d.life = 1.6; } }
+  DA.forEach(d => {
+    if (!d.live) { d.e.setAttribute('opacity', 0); return; }
+    if (!reduced) { d.x += d.vx * dt; d.y += d.vy * dt; } if (d.y > 172) { d.y = 172; d.vy = 0; d.vx *= .9; }
+    d.life -= dt; if (d.life <= 0) d.live = false;
+    d.e.setAttribute('cx', d.x.toFixed(1)); d.e.setAttribute('cy', d.y.toFixed(1)); d.e.setAttribute('opacity', clamp(d.life, 0, 1).toFixed(2));
+  });
+  const nA = Math.round(occ * ARI.length);
+  ARI.forEach((a, i) => {
+    if (!reduced) { a.x += a.vx * dt; if (a.x < -10) a.x = 650; if (a.x > 650) a.x = -10; }
+    a.e.setAttribute('x', a.x.toFixed(1)); a.e.setAttribute('y', (a.y + Math.sin(performance.now() / 600 + i) * 4).toFixed(1));
+    a.e.setAttribute('opacity', i < nA ? 1 : 0);
+  });
+  const s = signal(S.pw, occ * 100), t = performance.now() / 1000;
+  receptors.forEach((r, i) => {
+    const on = r.kind === 'da' ? 1 : r.kind === 'ari' ? PW[S.pw].ia / 2 : 0;
+    r.glow.setAttribute('r', (on * 12 * (reduced ? 1 : .8 + .2 * Math.sin(t * 4 + i))).toFixed(1));
+    r.glow.setAttribute('fill', r.kind === 'ari' ? 'var(--drug)' : 'var(--da)');
+  });
+}
+
+/* ---------- scenario outcomes ---------- */
+let sym = [], risks = [];
+function simSymptoms() {
+  // PANSS positive: baseline 26. Relief follows mesolimbic signal with a ~10-day lag.
+  sym = []; let relief = 0;
+  series.forEach((p, i) => {
+    const s = signal('meso_l', p.occ), target = clamp((1.7 - s) / (1.7 - .75), 0, 1);
+    relief += (target - relief) * (STEP / 24) / 10;
+    sym.push({ d: p.d, v: 26 - 13 * relief * (SCENARIO === 'effective' ? 1 : .8) });
+  });
+}
+function simRisks() {
+  risks = []; let ak = 0, nau = 0, icd = 0;
+  series.forEach(p => {
+    const o = p.occ / 100, dd = p.d, dt = STEP / 24;
+    const akT = 100 * hill(o, .885, 28) * (S.dose >= 15 ? 1 : .7);
+    ak += (akT - ak) * dt / 4;
+    const rise = p.c / (CSS_PER_MG * S.dose * S.cyp);
+    const nauT = 70 * hill(o, .85, 20) * Math.exp(-dd / 9) * clamp(rise * 1.3, 0, 1);
+    nau += (nauT - nau) * dt / 1.2;
+    const icdT = 45 * hill(o, .9, 30);
+    icd += (icdT - icd) * dt / 18;
+    risks.push({ d: dd, ak, nau, icd });
+  });
+}
+const effDefs = [
+  ['Hallucinations and delusions', 'Mesolimbic signal falls toward normal.', () => { const r = (26 - atArr(sym).v) / 13; return [r, r > .6 ? 'Clearly improving' : r > .25 ? 'Starting to improve' : 'Not yet']; }],
+  ['Agitation and hostility', 'Often eases within the first 1–2 weeks.', () => { const r = clamp(((26 - atArr(sym).v) / 13) * 1.2, 0, 1); return [r, r > .5 ? 'Calmer' : 'Early']; }],
+  ['Negative symptoms', 'Modest benefit; partial agonism may lift low cortical dopamine.', () => { const s = signal('meso_c', at(S.day).occ); const r = clamp((s - .55) / .45, 0, 1) * .6; return [r, 'Modest']; }],
+  ['Movement', 'Nigrostriatal signal is cut less than with full blockers.', () => { const o = at(S.day).occ; const r = 1 - hill(o / 100, .9, 25); return [r, r > .6 ? 'Preserved' : 'Watch for stiffness']; }],
+  ['Prolactin', 'Agonist-like action in the pituitary keeps it normal or low.', () => [1, 'Normal or low']],
+  ['Weight and metabolism', 'Among the lower-risk antipsychotics for weight gain.', () => [.85, 'Small change']]
+];
+const advDefs = [
+  ['Akathisia', 'Very common', 'Inner restlessness, urge to keep moving. Reported in about 8% (schizophrenia) to 25% (add-on for depression) in trials. Mechanism not settled; thought to involve reduced D2 signal in striatal and cortical circuits.', () => atArr(risks).ak, 'Weeks 1–4'],
+  ['Nausea and vomiting', 'Common', 'Usually early and short-lived while levels climb. Partial D2 activation in the brainstem vomiting center (area postrema) is a proposed cause.', () => atArr(risks).nau, 'Days 1–14'],
+  ['Impulse-control problems', 'Rare', 'Compulsive gambling, shopping, eating or sex. FDA warning added in 2016. Linked to D3/D2 agonist activity in reward circuits. Usually resolves after dose reduction or stopping.', () => atArr(risks).icd, 'Weeks to months'],
+  ['Insomnia and anxiety', 'Common', 'Activating rather than sedating for many people. 5-HT1A partial agonism and dopamine effects are thought to contribute.', () => clamp(at(S.day).occ - 70, 0, 25) * 2.4, 'Early'],
+  ['Stiffness, tremor (EPS)', 'Common', 'Less common than with older antipsychotics, but rises at D2 occupancy above about 90%.', () => 100 * hill(at(S.day).occ / 100, .925, 40), 'Weeks'],
+  ['Dizziness on standing', 'Uncommon', 'α1-adrenergic blockade can drop blood pressure when standing up, mostly early in treatment.', () => 30 * hill(at(S.day).c, 300, 2) * Math.exp(-S.day / 14), 'Early']
+];
+const atArr = arr => arr[clamp(Math.round(S.day * 24 / STEP), 0, arr.length - 1)];
+function renderCards() {
+  if (SCENARIO === 'effective') {
+    $('#effCards').innerHTML = effDefs.map(([n, w, f]) => { const [v, st] = f(); return `<div class="card"><div class="hd"><h3>${n}</h3><span class="state">${st}</span></div><div class="meter"><b style="width:${Math.round(clamp(v, 0, 1) * 100)}%"></b></div><p class="muted">${w}</p></div>`; }).join('');
+  } else {
+    $('#advCards').innerHTML = advDefs.map(([n, freq, w, f, onset]) => { const v = clamp(f(), 0, 100); return `<div class="card"><div class="hd"><h3>${n}</h3><span class="chip">${freq}</span></div><div class="meter"><b style="width:${Math.round(v)}%"></b></div><span class="mono muted" style="font-size:11px">Risk index ${Math.round(v)} · onset ${onset}</span><p class="muted">${w}</p></div>`; }).join('');
+  }
+}
+
+/* ---------- charts ---------- */
+function fit(cv) {
+  const dpr = Math.min(devicePixelRatio || 1, 2), w = cv.clientWidth, h = +(cv.dataset.h || (cv.dataset.h = cv.getAttribute('height')));
+  cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); cv.style.height = h + 'px';
+  const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); return [ctx, w, h];
+}
+const hovers = {};
+function timeChart(id, opts) {
+  const cv = $('#' + id), [ctx, w, h] = fit(cv), L = 40, R = 10, T = 10, B = 22;
+  const X = d => L + (w - L - R) * d / DAYS, Y = v => T + (h - T - B) * (1 - (v - opts.min) / (opts.max - opts.min));
+  ctx.fillStyle = C.surface; ctx.fillRect(0, 0, w, h);
+  if (opts.band) { ctx.fillStyle = C.drug; ctx.globalAlpha = .1; ctx.fillRect(L, Y(opts.band[1]), w - L - R, Y(opts.band[0]) - Y(opts.band[1])); ctx.globalAlpha = 1; }
+  ctx.strokeStyle = C.line; ctx.lineWidth = 1; ctx.fillStyle = C.muted; ctx.font = '10px JetBrains Mono, monospace';
+  opts.ticks.forEach(v => { const y = Math.round(Y(v)) + .5; ctx.beginPath(); ctx.moveTo(L, y); ctx.lineTo(w - R, y); ctx.stroke(); ctx.fillText(String(v), 4, y + 3); });
+  for (let d = 0; d <= DAYS; d += 7) { const s = d === 0 ? 'day 0' : 'wk ' + d / 7, tw = ctx.measureText(s).width; ctx.fillText(s, d === 0 ? X(d) : d === DAYS ? X(d) - tw : X(d) - tw / 2, h - 6); }
+  opts.lines.forEach(ln => {
+    ctx.strokeStyle = ln.col; ctx.lineWidth = 2; ctx.beginPath();
+    ln.data.forEach((p, i) => { const x = X(p.d), y = Y(ln.get(p)); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke();
+    if (ln.label) { const p = ln.data[ln.data.length - 1]; ctx.fillStyle = C.ink; ctx.fillText(ln.label, w - R - ctx.measureText(ln.label).width, Y(ln.get(p)) - 6); }
+  });
+  if (opts.refLine) { ctx.setLineDash([4, 4]); ctx.strokeStyle = C.muted; ctx.beginPath(); ctx.moveTo(L, Y(opts.refLine[0]) + .5); ctx.lineTo(w - R, Y(opts.refLine[0]) + .5); ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle = C.muted; ctx.fillText(opts.refLine[1], L + 4, Y(opts.refLine[0]) + (opts.refBelow ? 13 : -4)); }
+  // current day marker
+  const xd = X(S.day); ctx.strokeStyle = C.ink; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(xd + .5, T); ctx.lineTo(xd + .5, h - B); ctx.stroke();
+  opts.lines.forEach(ln => { const p = atArr(ln.data); ctx.fillStyle = ln.col; ctx.beginPath(); ctx.arc(xd, Y(ln.get(p)), 4.5, 0, 7); ctx.fill(); ctx.strokeStyle = C.surface; ctx.lineWidth = 2; ctx.stroke(); });
+  // hover
+  const hx = hovers[id], tip = $('#' + opts.tip);
+  if (hx != null) {
+    const d = clamp((hx - L) / (w - L - R) * DAYS, 0, DAYS), x = X(d);
+    ctx.strokeStyle = C.muted; ctx.lineWidth = 1; ctx.setLineDash([2, 3]); ctx.beginPath(); ctx.moveTo(x + .5, T); ctx.lineTo(x + .5, h - B); ctx.stroke(); ctx.setLineDash([]);
+    const idx = clamp(Math.round(d * 24 / STEP), 0, opts.lines[0].data.length - 1);
+    tip.hidden = false; tip.style.left = clamp(x, 90, w - 90) + 'px'; tip.style.top = T + 14 + 'px';
+    tip.textContent = `Day ${d.toFixed(1)} · ` + opts.lines.map(ln => (ln.name ? ln.name + ' ' : '') + opts.fmt(ln.get(ln.data[idx]))).join(' · ');
+  } else tip.hidden = true;
+}
+['cConc', 'cOcc', 'cSym', 'cRisk'].forEach(id => {
+  const cv = $('#' + id); if (!cv) return;
+  cv.addEventListener('pointermove', e => { hovers[id] = e.offsetX; drawCharts(); });
+  cv.addEventListener('pointerleave', () => { hovers[id] = null; drawCharts(); });
+});
+function drawCharts() {
+  const cmax = Math.max(400, Math.ceil(Math.max(...series.map(p => p.c)) / 100) * 100);
+  const cticks = []; for (let v = 0; v <= cmax; v += cmax > 800 ? 200 : 100) cticks.push(v);
+  timeChart('cConc', { min: 0, max: cmax, ticks: cticks, band: [100, 350], tip: 'tConc', fmt: v => Math.round(v) + ' ng/mL', lines: [{ data: series, get: p => p.c, col: C.drug }] });
+  timeChart('cOcc', { min: 0, max: 100, ticks: [0, 25, 50, 75, 100], band: [80, 90], refLine: [90, 'above ~90%: more motor side effects'], refBelow: true, tip: 'tOcc', fmt: v => Math.round(v) + '%', lines: [{ data: series, get: p => p.occ, col: C.drug }] });
+  if (SCENARIO === 'effective') timeChart('cSym', { min: 7, max: 30, ticks: [7, 12, 17, 22, 27], tip: 'tSym', fmt: v => v.toFixed(1), refLine: [26, 'baseline 26'], lines: [{ data: sym, get: p => p.v, col: C.drug }] });
+  else timeChart('cRisk', { min: 0, max: 100, ticks: [0, 25, 50, 75, 100], tip: 'tRisk', fmt: v => Math.round(v), lines: [
+    { data: risks, get: p => p.ak, col: C.s1, name: 'Akathisia', label: 'Akathisia' },
+    { data: risks, get: p => p.nau, col: C.s2, name: 'Nausea', label: 'Nausea' },
+    { data: risks, get: p => p.icd, col: C.s3, name: 'Impulse', label: 'Impulse control' }] });
+  drawAff();
+}
+const AFF = [['D2', .34, 'partial agonist'], ['5-HT2B', .36, 'antagonist'], ['D3', .8, 'partial agonist'], ['5-HT1A', 1.7, 'partial agonist'], ['5-HT2A', 3.4, 'antagonist'], ['5-HT2C', 15, 'partial agonist'], ['5-HT7', 39, 'antagonist'], ['D4', 44, 'partial agonist'], ['α1-adrenergic', 57, 'antagonist'], ['H1 histamine', 61, 'antagonist'], ['Serotonin transporter', 98, 'weak inhibitor']];
+let affHover = null;
+function drawAff() {
+  const cv = $('#cAff'), [ctx, w, h] = fit(cv), L = 150, R = 175, T = 6, rowH = (h - T - 22) / AFF.length;
+  ctx.fillStyle = C.surface; ctx.fillRect(0, 0, w, h);
+  // log scale: 0.1 nM (left, strongest) to 1000 nM
+  const X = ki => L + (w - L - R) * (Math.log10(1000) - Math.log10(ki)) / 4;
+  ctx.font = '10px JetBrains Mono, monospace'; ctx.fillStyle = C.muted; ctx.strokeStyle = C.line;
+  [1000, 100, 10, 1, .1].forEach(v => { const x = Math.round(X(v)) + .5; ctx.beginPath(); ctx.moveTo(x, T); ctx.lineTo(x, h - 20); ctx.stroke(); ctx.fillText(v + ' nM', x - 14, h - 6); });
+  AFF.forEach(([n, ki, act], i) => {
+    const y = T + i * rowH + rowH * .2, bh = rowH * .6;
+    ctx.fillStyle = C.ink; ctx.font = '12px Archivo, sans-serif'; ctx.fillText(n, 8, y + bh * .75);
+    ctx.fillStyle = C.drug; ctx.globalAlpha = affHover === i ? 1 : .85;
+    const x0 = X(1000), x1 = X(ki); ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x0, y, x1 - x0, bh, [0, 4, 4, 0]) : ctx.rect(x0, y, x1 - x0, bh); ctx.fill(); ctx.globalAlpha = 1;
+    ctx.fillStyle = C.ink; ctx.font = '11px JetBrains Mono, monospace'; ctx.fillText(ki + ' nM', x1 + 6, y + bh * .75);
+    ctx.fillStyle = C.muted; ctx.fillText(act, w - R + 62, y + bh * .75);
+  });
+}
+$('#cAff').addEventListener('pointermove', e => {
+  const h = 300, rowH = (h - 6 - 22) / AFF.length, i = Math.floor((e.offsetY - 6) / rowH), tip = $('#tAff');
+  if (i >= 0 && i < AFF.length) { affHover = i; tip.hidden = false; tip.style.left = e.offsetX + 'px'; tip.style.top = e.offsetY + 'px'; tip.textContent = `${AFF[i][0]} · Ki ${AFF[i][1]} nM · ${AFF[i][2]}`; } else { affHover = null; tip.hidden = true; }
+  drawAff();
+});
+$('#cAff').addEventListener('pointerleave', () => { affHover = null; $('#tAff').hidden = true; drawAff(); });
+
+/* ---------- update ---------- */
+function update() {
+  const p = at(S.day);
+  $('#dayVal').textContent = 'Day ' + (S.day % 1 ? S.day.toFixed(2) : S.day);
+  $('#rConc').textContent = Math.round(p.c) + ' ng/mL';
+  $('#rOcc').textContent = Math.round(p.occ) + '%';
+  $('#rSS').textContent = '~day ' + S.ssDay;
+  updateSynapse(); renderCards(); drawCharts();
+}
+$('#dose').addEventListener('change', e => { S.dose = +e.target.value; simulate(); update(); });
+$('#cyp').addEventListener('change', e => { S.cyp = +e.target.value; simulate(); update(); });
+$('#day').addEventListener('input', e => { S.day = +e.target.value; update(); });
+const recolor = () => { readColors(); update(); };
+new MutationObserver(recolor).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', recolor);
+let rt; addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(drawCharts, 120); });
+
+readColors(); simulate(); selectPw(S.pw); update();
+let last = performance.now();
+const loop = now => { const dt = Math.min(.1, (now - last) / 1000); last = now; synFrame(dt); requestAnimationFrame(loop); };
+requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
